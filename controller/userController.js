@@ -6,6 +6,7 @@ const uploadImageCloudinary = require("../middleware/multerMiddleware");
 // Controller Functions
 const registerUser = async (req, res) => {
   try {
+    console.log(req.body)
     const { name, email, password, location } = req.body;
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ message: "User already exists" });
@@ -16,6 +17,7 @@ const registerUser = async (req, res) => {
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
+    console.log("Error" + error)
     res.status(500).json({ message: "Server Error" });
   }
 };

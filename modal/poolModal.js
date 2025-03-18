@@ -13,5 +13,5 @@ const PoolSchema = new mongoose.Schema({
 });
 
 const Pool = mongoose.model('Pool', PoolSchema);
-module.exports = {  Pool };
+module.exports = Pool;
 
