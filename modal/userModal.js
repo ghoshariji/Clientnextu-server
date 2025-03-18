@@ -16,7 +16,7 @@ const UserSchema = new mongoose.Schema({
   poolMap: [{ type: mongoose.Schema.Types.ObjectId, ref: "Pool" }],
   profileImage: {
     type: String,
-    default: "",
+    default: "https://i.pinimg.com/474x/b5/e5/fc/b5e5fc940044d2f862acbd07b9da35b2.jpg",
   },
 });
 
