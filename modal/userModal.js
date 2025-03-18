@@ -14,6 +14,10 @@ const UserSchema = new mongoose.Schema({
   subscription: { type: Boolean, default: false },
   feedbacks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Feedback" }],
   poolMap: [{ type: mongoose.Schema.Types.ObjectId, ref: "Pool" }],
+  profileImage: {
+    type: String,
+    default: "",
+  },
 });
 
 const User = mongoose.model("User", UserSchema);

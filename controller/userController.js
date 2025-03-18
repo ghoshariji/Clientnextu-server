@@ -1,6 +1,7 @@
 const User = require("../modal/userModal");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const uploadImageCloudinary = require("../middleware/multerMiddleware");
 
 // Controller Functions
 const registerUser = async (req, res) => {
@@ -38,4 +39,32 @@ const loginUser = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser };
+const uploadPicture = async (req, res) => {
+  try {
+    const token = req.header("Authorization").split(" ")[1]; // Get token from headers
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
+    const userId = decoded.id;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No image provided" });
+    }
+
+    // Upload image to Cloudinary
+    const result = await uploadImageCloudinary(req.file);
+
+    // Update user profile with image URL
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { profileImage: result },
+      { new: true }
+    );
+
+    res
+      .status(200)
+      .json({ message: "Profile picture uploaded successfully", user });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+module.exports = { registerUser, loginUser, uploadPicture };
