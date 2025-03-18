@@ -19,12 +19,14 @@ db();
 
 // Import routes
 const userRoute = require("./route/userRoute");
+const poolRoute = require("./route/poolRoute");
 
 // Static files
 app.use(express.static(path.join(__dirname, "./docs")));
 
 // Routes
 app.use("/api/auth/user", userRoute);
+app.use("/api/auth/pool", poolRoute);
 
 // Start the server
 app.listen(PORT, () => {
