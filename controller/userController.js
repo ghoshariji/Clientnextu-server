@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const uploadImageCloudinary = require("../middleware/multerMiddleware");
 const { getDistance } = require("geolib");
 const geolib = require("geolib");
+const Pool = require("../modal/poolModal");
 
 // Controller Functions
 const registerUser = async (req, res) => {
@@ -137,7 +138,7 @@ const findNearbyUsers = async (req, res) => {
     // Fetch all users except the requester
     const allUsers = await User.find({ _id: { $ne: req.user.id } });
 
-    // Filter users within 10 km (10,000 meters)
+    // Filter users within 10 km
     const nearbyUsers = allUsers
       .filter((user) => {
         if (!user.location || typeof user.location !== "object") return false;
@@ -155,10 +156,7 @@ const findNearbyUsers = async (req, res) => {
       .map((user) => {
         const distanceInMeters = geolib.getDistance(
           { latitude, longitude },
-          {
-            latitude: user.location.latitude,
-            longitude: user.location.longitude,
-          }
+          { latitude: user.location.latitude, longitude: user.location.longitude }
         );
 
         const distanceInKm = geolib.convertDistance(distanceInMeters, "km");
@@ -172,12 +170,55 @@ const findNearbyUsers = async (req, res) => {
         };
       });
 
-    console.log(nearbyUsers);
+    // Fetch all pools except those created by the requesting user
+    const allPools = await Pool.find({ userPool: { $ne: req.user.id } });
 
-    res.json({ nearbyUsers, totalUsers: nearbyUsers.length });
+    // Filter pools within 10 km
+    const nearbyPools = allPools
+      .filter((pool) => {
+        if (!pool.location || typeof pool.location !== "object") return false;
+        const { latitude: poolLat, longitude: poolLong } = pool.location;
+        if (!poolLat || !poolLong || isNaN(poolLat) || isNaN(poolLong))
+          return false;
+
+        const distance = geolib.getDistance(
+          { latitude, longitude },
+          { latitude: poolLat, longitude: poolLong }
+        );
+
+        return distance <= 10000; // 10 km
+      })
+      .map((pool) => {
+        const distanceInMeters = geolib.getDistance(
+          { latitude, longitude },
+          { latitude: pool.location.latitude, longitude: pool.location.longitude }
+        );
+
+        const distanceInKm = geolib.convertDistance(distanceInMeters, "km");
+
+        return {
+          id: pool._id,
+          activity: pool.activity,
+          destination: pool.destination,
+          time: pool.time,
+          comments: pool.comments,
+          userPool: pool.userPool,
+          distance: distanceInKm.toFixed(2) + " km",
+          meters: distanceInMeters + " m",
+        };
+      });
+
+    console.log({ nearbyUsers, nearbyPools });
+
+    res.json({
+      nearbyUsers,
+      totalUsers: nearbyUsers.length,
+      nearbyPools,
+      totalPools: nearbyPools.length,
+    });
   } catch (error) {
-    console.error("Error fetching nearby users:", error);
-    res.status(500).json({ error: "Server error while fetching nearby users" });
+    console.error("Error fetching nearby users and pools:", error);
+    res.status(500).json({ error: "Server error while fetching data" });
   }
 };
 
@@ -220,6 +261,37 @@ const updateProfile = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+const getUserPoolData = async (req, res) => {
+  try {
+    console.log("Received Request for User Pool Data");
+
+    const userPoolId = req.query.id; // Extract id from query params
+    console.log("UserPool ID:", userPoolId);
+
+    if (!userPoolId) {
+      return res.status(400).json({ message: "Missing userPool ID" });
+    }
+
+    // Fetch user data with selected fields
+    const userData = await User.findById(userPoolId).select("name email age profileImage");
+
+    if (!userData) {
+      return res.status(404).json({ message: "User Pool not found" });
+    }
+
+    return res.status(200).json({
+      message: "Success",
+      data: userData,
+    });
+
+  } catch (error) {
+    console.error("Server Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
 module.exports = {
   registerUser,
   loginUser,
@@ -228,4 +300,5 @@ module.exports = {
   findNearbyUsers,
   getUserData,
   updateProfile,
+  getUserPoolData
 };
