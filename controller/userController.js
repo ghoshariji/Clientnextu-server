@@ -8,12 +8,12 @@ const geolib = require("geolib");
 // Controller Functions
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, location } = req.body;
+    const { name, email, password, location,age } = req.body;
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    user = new User({ name, email, password: hashedPassword, location });
+    user = new User({ name, email, password: hashedPassword, location,age });
     await user.save();
 
     res.status(201).json({ message: "User registered successfully" });
@@ -44,10 +44,18 @@ const loginUser = async (req, res) => {
 
 const uploadPicture = async (req, res) => {
   try {
-    const token = req.header("Authorization").split(" ")[1]; // Get token from headers
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
+    const authHeader = req.header("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Unauthorized: No valid token" });
+    }
+
+    const token = authHeader.split(" ")[1]; // ✅ Extract token properly
+    console.log("Received Token:", token);
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // ✅ Verify token
     const userId = decoded.id;
 
+    console.log(req.file)
     if (!req.file) {
       return res.status(400).json({ message: "No image provided" });
     }
@@ -55,20 +63,23 @@ const uploadPicture = async (req, res) => {
     // Upload image to Cloudinary
     const result = await uploadImageCloudinary(req.file);
 
+    console.log(result)
     // Update user profile with image URL
     const user = await User.findByIdAndUpdate(
       userId,
-      { profileImage: result },
+      { profileImage: result.secure_url }, // ✅ Store only the URL string
       { new: true }
     );
-
-    res
-      .status(200)
-      .json({ message: "Profile picture uploaded successfully", user });
+    res.status(200).json({
+      message: "Profile picture uploaded successfully",
+      user,
+    });
   } catch (error) {
+    console.error("JWT Verification Error:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
+
 
 const latestUserFive = async (req, res) => {
   try {
@@ -115,24 +126,24 @@ const findNearbyUsers = async (req, res) => {
     const { latitude, longitude } = req.body;
 
     // Validate input
-    if (typeof latitude !== "number" || typeof longitude !== "number") {
+    if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
       return res.status(400).json({ error: "Invalid latitude or longitude" });
     }
 
-    // Update the user's location in the database
+    // Update the user's current location in the database
     await User.findByIdAndUpdate(req.user.id, {
       location: { latitude, longitude },
     });
 
-    // Fetch all users (excluding the requester)
+    // Fetch all users except the requester
     const allUsers = await User.find({ _id: { $ne: req.user.id } });
 
-    // Filter users within 20km and extract only name, profileImage, and distance
+    // Filter users within 10 km (10,000 meters)
     const nearbyUsers = allUsers
       .filter((user) => {
         if (!user.location || typeof user.location !== "object") return false;
         const { latitude: userLat, longitude: userLong } = user.location;
-        if (typeof userLat !== "number" || typeof userLong !== "number")
+        if (!userLat || !userLong || isNaN(userLat) || isNaN(userLong))
           return false;
 
         const distance = geolib.getDistance(
@@ -140,37 +151,55 @@ const findNearbyUsers = async (req, res) => {
           { latitude: userLat, longitude: userLong }
         );
 
-        return distance <= 20000; // 20km in meters
+        return distance <= 10000; // 10 km
       })
       .map((user) => {
-        const distance = geolib.getDistance(
+        const distanceInMeters = geolib.getDistance(
           { latitude, longitude },
-          {
-            latitude: user.location.latitude,
-            longitude: user.location.longitude,
-          }
+          { latitude: user.location.latitude, longitude: user.location.longitude }
         );
 
+        const distanceInKm = geolib.convertDistance(distanceInMeters, "km");
+
         return {
-          id:user._id,
+          id: user._id,
           name: user.name,
           profileImage: user.profileImage,
-          distance, // Distance in meters
+          distance:  distanceInKm.toFixed(2) + " km",
+          meters: distanceInMeters + " m",
+       
         };
       });
 
     console.log(nearbyUsers);
 
-    res.json(nearbyUsers);
+    res.json({ nearbyUsers, totalUsers: nearbyUsers.length });
   } catch (error) {
     console.error("Error fetching nearby users:", error);
-    res.status(500).json({ error: "Server error while fetching matches" });
+    res.status(500).json({ error: "Server error while fetching nearby users" });
   }
 };
+
+const getUserData = async(req,res) =>{
+  try {
+    const userId = req.user.id; // Extracted from the token
+    const user = await User.findById(userId).select("-password -feedbacks -poolMap"); // Exclude password
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+}
 module.exports = {
   registerUser,
   loginUser,
   uploadPicture,
   latestUserFive,
   findNearbyUsers,
+  getUserData
 };

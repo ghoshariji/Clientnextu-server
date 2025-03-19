@@ -10,6 +10,7 @@ cloudinary.config({
 const uploadImageCloudinary = async (image) => {
   if (!image) throw new Error("No image provided");
 
+  console.log(image)
   const buffer = image?.buffer || Buffer.from(await image.arrayBuffer());
 
   return new Promise((resolve, reject) => {

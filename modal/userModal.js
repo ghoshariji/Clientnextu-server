@@ -9,6 +9,10 @@ const UserSchema = new mongoose.Schema({
     latitude: { type: Number, required: true },
     longitude: { type: Number, required: true },
   },
+  age:{
+    type:Number,
+    default:0
+  },
   credits: { type: Number, default: 0 },
   referAndEarn: { type: Number, default: 0 },
   subscription: { type: Boolean, default: false },
