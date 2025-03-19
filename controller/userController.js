@@ -8,12 +8,12 @@ const geolib = require("geolib");
 // Controller Functions
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, location,age } = req.body;
+    const { name, email, password, location, age } = req.body;
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    user = new User({ name, email, password: hashedPassword, location,age });
+    user = new User({ name, email, password: hashedPassword, location, age });
     await user.save();
 
     res.status(201).json({ message: "User registered successfully" });
@@ -55,7 +55,7 @@ const uploadPicture = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // ✅ Verify token
     const userId = decoded.id;
 
-    console.log(req.file)
+    console.log(req.file);
     if (!req.file) {
       return res.status(400).json({ message: "No image provided" });
     }
@@ -63,7 +63,7 @@ const uploadPicture = async (req, res) => {
     // Upload image to Cloudinary
     const result = await uploadImageCloudinary(req.file);
 
-    console.log(result)
+    console.log(result);
     // Update user profile with image URL
     const user = await User.findByIdAndUpdate(
       userId,
@@ -79,7 +79,6 @@ const uploadPicture = async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
-
 
 const latestUserFive = async (req, res) => {
   try {
@@ -156,7 +155,10 @@ const findNearbyUsers = async (req, res) => {
       .map((user) => {
         const distanceInMeters = geolib.getDistance(
           { latitude, longitude },
-          { latitude: user.location.latitude, longitude: user.location.longitude }
+          {
+            latitude: user.location.latitude,
+            longitude: user.location.longitude,
+          }
         );
 
         const distanceInKm = geolib.convertDistance(distanceInMeters, "km");
@@ -165,9 +167,8 @@ const findNearbyUsers = async (req, res) => {
           id: user._id,
           name: user.name,
           profileImage: user.profileImage,
-          distance:  distanceInKm.toFixed(2) + " km",
+          distance: distanceInKm.toFixed(2) + " km",
           meters: distanceInMeters + " m",
-       
         };
       });
 
@@ -180,11 +181,13 @@ const findNearbyUsers = async (req, res) => {
   }
 };
 
-const getUserData = async(req,res) =>{
+const getUserData = async (req, res) => {
   try {
     const userId = req.user.id; // Extracted from the token
-    const user = await User.findById(userId).select("-password -feedbacks -poolMap"); // Exclude password
-    
+    const user = await User.findById(userId).select(
+      "-password -feedbacks -poolMap"
+    ); // Exclude password
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -194,12 +197,35 @@ const getUserData = async(req,res) =>{
     console.error(error);
     res.status(500).json({ message: "Server error" });
   }
-}
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Name is required" });
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { name },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ message: "Profile updated successfully", updatedUser });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
 module.exports = {
   registerUser,
   loginUser,
   uploadPicture,
   latestUserFive,
   findNearbyUsers,
-  getUserData
+  getUserData,
+  updateProfile,
 };
