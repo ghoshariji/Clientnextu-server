@@ -20,6 +20,8 @@ db();
 // Import routes
 const userRoute = require("./route/userRoute");
 const poolRoute = require("./route/poolRoute");
+const feeedbackRoute = require("./route/feeedbackRoute");
+const chatRoute = require("./route/chatRoute");
 
 // Static files
 app.use(express.static(path.join(__dirname, "./docs")));
@@ -27,6 +29,8 @@ app.use(express.static(path.join(__dirname, "./docs")));
 // Routes
 app.use("/api/auth/user/v1", userRoute);
 app.use("/api/auth/pool", poolRoute);
+app.use("/api/auth/feedback", feeedbackRoute);
+app.use("/api/auth/chat", chatRoute);
 
 
 app.get("/",(req,res)=>{
